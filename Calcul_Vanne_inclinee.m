@@ -2,6 +2,8 @@
 % Programme de calcul d'une vanne inclinee
 % Auteur: G. Belaud (UMR G-eau) - février 2016
 % Mise à jour 01 Juin 2017: calcul pour vanne complètement ouverte, avec loi universelle de perte de charge
+% Mise à jour 28 Août 2018: ajout fonction, révision test free flow
+% Mise à jour 31 Octobre 2018: calcul de Cc de façon tabulaire
 %-------------------------------------------------------------------------------------------------------
 
 % Notations:
@@ -11,49 +13,71 @@
 % s=h1/H0
 % a=W/H0
 
+% Fonctions externes à utiliser:
+% CcFree : calcuule l'angle pour une vanne dénoyée à faible ouverture, en
+% fonction de l'angle
+
 %-------------------------------------------------------------------------------------------------------
 % Initialisation, constantes, parametres de calcul
 %-------------------------------------------------------------------------------------------------------
 
 %%%%%geometrie_vanne; % definition de la geometrie de la vanne, autres constantes
-Imax=50; % nombre d'iterations de boucles maximal
-epsh1=0.001; % precision relative sur le niveau aval pour le calcul itÃ©ratif
+Imax=20; % nombre d'iterations de boucles maximal
+epsQ1=0.001; % precision relative sur le debit pour le calcul itÃ©ratif
 Cc0=0.61;
-corr=0; %coefficient correcteur (pertes de charge, etc.)
+corr=0; %coefficient correcteur (pertes de charge, etc.) - Ref: Belaud et al., (2009), JHE [coefficent k]
 g=9.81; %constante gravitationnelle
+
 
 %-------------------------------------------------------------------------------------------------------
 % Niveaux d'eau, ouvertures et positions. Valeurs en mètres pour les
 % longueurs, en degres pour les angles
 %-------------------------------------------------------------------------------------------------------
-X=load('data_test.txt','-ascii');
-Ham=X(:,1); %hauteur amont
-Hav=X(:,2); %hauteur aval
+%X=load('data_test.txt','-ascii');
+X=load('test45deg.txt','-ascii');
+%X=load('test45degFree.txt','-ascii');
+Zam=X(:,1); %cote amont - reference=crete ouvrage
+Zav=X(:,2); %cote aval - reference=crete ouvrage
 Wvanne=X(:,3); %ouverture
-Avanne=X(:,4); %angle en degres - angle entre l'horizontale et la vanne (90=verticale, <90 ouverte vers l'aval)
-Nmes=length(Ham);
+Avanne=X(:,4); %angle en degres - angle entre l'horizontale (orientée vers l'amont) et la vanne (90=verticale, <90 ouverte vers l'aval)
+Nmes=length(Zam);
 
 % donnees de la vanne fixes
-cote_radier=0; % pourra etre mis comme vecteur si besoin
-B=1;
-B2=1;
-DX=10; % distance entre les mesures amont et aval - utile uniquement pour vanne complètement ouverte
-Cf=0.02 ; % coefficient de frottement
+pelle_amont=0; % hauteur entre la crete (=cote 0) et le fond du canal à l'amont. Pourra etre mis comme vecteur si besoin
+pelle_aval=0; % hauteur de la marche côté aval de la vanne (decrochement vers le bas)
+B=1; % largeur de la vanne
+B2=1; % largeur du canal aval
+DX=10; % distance en m entre les mesures amont et aval - utile uniquement pour vanne complètement ouverte pour calculer une perte de charge
+Cf=0.02 ; % coefficient de frottement pour le calcul de cette perte de charge
 
 %-------------------------------------------------------------------------------------------------------
-N1=1;
-N2=Nmes;
+N1=1; %indice de depart de la ligne de donnees a calculer
+N2=Nmes;  %indice de fin de la ligne de donnees a calculer
+
+
+%-------------------------------------------------------------------------------------------------------
+% Sauvegarde dans un fichier texte des résultats
+%-------------------------------------------------------------------------------------------------------
+u1=fopen('results_calcul_Q.txt','w');
+fprintf(u1,'%s\n','Results of gate calculation, according to the method published in Belaud et al, 2014, with tabulated Cc');
+fprintf(u1,'%s\n','    h0     h1      W angle Dischar. R     Cd     Cc  dQ/dW dQ/dh0 dQ/dh2 -- R: regime noye=3, partiellement noye=2, denoye=1 ');
+
+
+
 for k=N1:N2
 %-------------------------------------------------------------------------------------------------------
-% Boucle sur les differentes mesures
+% Boucle sur les differentes donnees
 %-------------------------------------------------------------------------------------------------------
-h0=Ham(k)-cote_radier;   % hauteur amont
-h2=Hav(k)-cote_radier;    % hauteur aval
+h0=Zam(k)+pelle_amont;   % hauteur amont
+z2=Zav(k); %cote aval=hauteur par rapport à la crete
+h2=z2+pelle_aval;    % cote aval par rapport au radier
 
 % ----------------Vanne inclinee-------------------
-
 W=Wvanne(k);          % ouverture
 angle=Avanne(k);     % angle de la vanne
+Qref=Cc0*W*B*sqrt(2*g*h0); %Valeur de refernce pour le debit (pour tests d'arret)
+dQmax=max(0.001,Qref)*epsQ1; % precision attendue sur Q
+Q1=Qref;
 
 if W<(h0*0.99)
 %------------------------------------------------------------
@@ -61,60 +85,87 @@ if W<(h0*0.99)
 %------------------------------------------------------------
     
 % Initialisations
+Free=0;
 H0=h0; % Point de depart initialisation: charge=hauteur
-h1=0.5*(h2+Cc0*W); % valeur a priori, comme moyenne entre un niveau denoye et completement noye
-h1=h2;
+Cc_F=Cc(W/H0,0,angle); %appel de la fonction approchee du calcul de Cc 
 
-% Boucle itérative
+h1_F=Cc_F*W; %hauteur definie par le jet issu de la vanne dénoyee
+if z2<=h1_F 
+    % L'ecoulement est denoyé: pas d'influence aval
+    Free=1;
+    h1=h1_F;
+else
+    Free=0; % on n'est pas sur que l'ecoulement soit libre
+    h1=0.5*(z2+h1_F); % valeur a priori, comme moyenne entre les 2 niveaux h1_F et z2
+end
+
+% Boucle itérative en supposant H0=h0
 i=0;
-dh1=1000;
-while (i<Imax)&(abs(dh1)>epsh1) 
+dQ1=1000;
+while (i<Imax)&(abs(dQ1)>dQmax) 
     i=i+1; % compteur de boucle
     % valeurs initiales estimees
     a=W/H0;
+    %Test si le niveau aval est 
+    
     s=h1/H0;
     % Hauteur de la veine contractee
     Cc1=Cc(a,s,angle); %appel de la fonction approchee du calcul de Cc - a verifier pour angles>90
     h3=Cc1*W;   % hauteur contractee avec a, s et H0 estimes
-    h3m=Cc(a,0,angle)*W; % Hauteur contractee en ecoulement libre
-
 
     % Debit estime par Bernoulli entre amont et section contractee, avec
     % correction donnee par eps
     Qit=sqrt(2.*g*(h0-h1)/(1./h3^2-1./h0^2))*B/sqrt(1.+corr);
+    h1it=h3;
+    
+    %Fin du calcul si l'écoulement est denoyé
 
-    % Tests de quantite de mouvement entre section contractee et aval:
-    %Impulsion aval
-    M2=g*B2*h2^2+2.*Qit^2/(h2*B2); 
-    % impulsion dans la veine contractee
-    M3=g*B2*h1^2+2*Qit^2/(h3*B); % expression qu'on pourra faire evoluer pour tenir compte de la hauteur d'eau 
-    % sur les cotes, dans le cas ou la vanne est moins large que
-    % l'ecoulement (B2>B)
+    if Free==0
+        %On est dans le cas incertain noyé ou denoye, mais z2=h2-pelle_aval >h1_F
+        % Tests de quantite de mouvement entre section contractee et aval: M2=Impulsion aval
+        % Attention, en cas de pelle aval non nulle, M2 tient compte du
+        % fait que la force sur la pelle aval s'annule 
+        M2=g*B2*z2^2+2.*Qit^2/(h2*B2);
+        % M3=impulsion dans la veine contractee, calculée avec la vitesse dans le
+     % jet et la force de pression hydrostatique de la colonne de hauteur h1
+        M3=g*B2*h1^2+2*Qit^2/(h3*B); % expression qu'on pourra faire evoluer pour tenir compte de la hauteur d'eau 
+     % sur les cotes, dans le cas ou la vanne est moins large que l'ecoulement (B2>B)
 
-    %impulsion aval inférieure à l'impulsion amont
-    if (M2<M3)    
+        h3m=Cc(a,0,angle)*W; % Hauteur contractee en ecoulement libre
+        %impulsion aval inférieure à l'impulsion amont
+        if (M2<M3)    
         h1it=h3m; % On fait l'hypothese de free flow car le ressaut va alors se faire apres une courbe de remous F3
-    else
-    % M3 insuffisant: il faut rajouter de la force de pression pour equilibrer M2
-    % hauteur permettant de retrouver l'impulsion aval
+        Free=1;
+        else
+        % Impulsion aval superieure à l'impulsion amont
+        % M3 insuffisant: il faut rajouter de la force de pression (h1 doit être plus élevé) pour equilibrer M2
+        % hauteur permettant de retrouver l'impulsion aval, en supposant Q
+        % inchangé:
         dM=(M2-2.*Qit^2/(h3*B))/(g*B);
-        if (dM<h3m^2)
+        if (dM<h3m^2) % cas qui ne devrait pas arriver
         h1it=h3m;  % Niveau denoye - niveau physiquement minimum
+        Free=1;
         else
         h1it=sqrt(dM); % noye
         end
+        end
     end
-
+    
     % Actualisation
-    dh1=(h1it-h1)/h1;
-    h1=h1it;
+    %dh1=(h1it-h1)/h1;
+    %h1=h1it;
+    dQ1=(Qit-Q1)/Qref; %test d'arret sur Q
+    Q1=Qit;
+
     Qt(i)=Qit; % valeurs temporaires pour tester la convergence
     h1t(i)=h1;
     H0=h0+Qit^2/(2.*g*B^2*h0^2); %mise a jour de la charge amont
 
-    % Fin du calcul pour l'ouverture w(k)
+%------------------------------
+% Fin des iterations
+%------------------------------
 end
-
+% Fin du calcul pour l'ouverture w(k)
 %/ Sauvegarde des valeurs obtenues
 a=W/H0;
 s=h1/H0;
@@ -178,9 +229,13 @@ Q(k)=U*Smoy;
 dQdW=0.;
 dQdhm=Smoy*sqrt(2.*R*g/(Cf*DX*dH));
 dQdhv=-dQdhm;
-end
 
 end
+fprintf(u1,'%6.3f %6.3f %6.3f %5.1f %8.4f %1i %6.3f %6.3f %6.3f %6.3f %6.3f\n',h0,h1,W,angle, Q(k),...
+    etatVanne(k),Cd(k),Cc_app(k),dQdW,dQdhm,dQdhv);
+end
+
+fclose(u1);
 
 
 
