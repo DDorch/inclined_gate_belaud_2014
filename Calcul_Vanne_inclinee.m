@@ -5,6 +5,7 @@
 %-------------------------------------------------------------------------------------------------------
 
 test_vanne("data_test");
+test_vanne("test45deg");
 
 % Notations:
 % W=ouverture
@@ -50,7 +51,7 @@ function test_vanne(sInput)
     %-------------------------------------------------------------------------------------------------------
     % Sauvegarde des résultats dans un fichier texte
     %-------------------------------------------------------------------------------------------------------
-    u1 = fopen(strcat('results_calcul_Q_', sInput, '.txt'), 'w');
+    u1 = fopen(strcat('results_calcul_Q_v20170601_', sInput, '.txt'), 'w');
     fprintf(u1, '%s\n', 'Results of gate calculation, according to the method published in Belaud et al, 2014, with tabulated Cc');
     fprintf(u1, '%s\n', '    h0     h1      W angle Dischar. R     Cd     Cc   nbIter -- R: regime noye=3, partiellement noye=2, denoye=1 ');
 
