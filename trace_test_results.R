@@ -35,9 +35,9 @@ trace_test_results <- function (sTest, lVersions) {
     m = as.matrix(df)
     
     png(paste0(paste(sTest, varToDraw, sep = "_"), ".png"), width = 800, height = 600)
-    par(mar=c(5.1, 13 ,4.1 ,2.1))
+    par(mar=c(5.1, 14 ,4.1 ,2.1))
     barplot(m,
-            main = paste("Versions comparison on", varToDraw), 
+            main = paste("Test", sTest, ": Versions comparison on", varToDraw), 
             xlab = paste("Value of", varToDraw),
             # ylab = "Experiment",
             horiz = TRUE, 
