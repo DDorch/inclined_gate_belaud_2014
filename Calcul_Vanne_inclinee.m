@@ -63,7 +63,7 @@ function test_vanne(sInput, Modele)
     sModele = ["formule", "tabul"];
     u1 = fopen(strcat('results_calcul_Q_v20181031_', sInput, '_', sModele(Modele), '.txt'), 'w');
     fprintf(u1, '%s\n', 'Results of gate calculation, according to the method published in Belaud et al, 2014, with tabulated Cc');
-    fprintf(u1, '%s\n', '    h0     h1      W angle Dischar. R     Cd     Cc  dQ/dW dQ/dh0 dQ/dh2 nbIter -- R: regime noye=3, partiellement noye=2, denoye=1 ');
+    fprintf(u1, '%s\n', '    h0     h2      W angle Dischar. R     Cd     Cc     h1  dQ/dW dQ/dh0 dQ/dh2 nbIter -- R: regime noye=3, partiellement noye=2, denoye=1 ');
 
     %-------------------------------------------------------------------------------------------------------
     % Boucle sur les differentes donnees
@@ -76,8 +76,8 @@ function test_vanne(sInput, Modele)
 
         [Q, h1, etatVanne, Cd, Cc_app, dQdW, dQdhm, dQdhv, nbIter] = CalculQ(h0, z2, pelle_aval, W, angle, Cc0, B, B2, corr, Modele);
 
-        fprintf(u1, '%6.3f %6.3f %6.3f %5.1f %8.4f %1i %6.3f %6.3f %6.3f %6.3f %6.3f %3i\n', h0, h1, W, angle, Q, ...
-            etatVanne, Cd, Cc_app, dQdW, dQdhm, dQdhv, nbIter);
+        fprintf(u1, '%6.3f %6.3f %6.3f %5.1f %8.4f %1i %6.3f %6.3f %6.3f %6.3f %6.3f %6.3f %3i\n', h0, z2 + pelle_aval, W, angle, Q, ...
+            etatVanne, Cd, Cc_app, h1, dQdW, dQdhm, dQdhv, nbIter);
     end
 
     fclose(u1);
