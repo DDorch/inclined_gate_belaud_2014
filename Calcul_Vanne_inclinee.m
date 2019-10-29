@@ -53,7 +53,7 @@ function test_vanne(sInput)
     %-------------------------------------------------------------------------------------------------------
     u1 = fopen(strcat('results_calcul_Q_v20170601_', sInput, '.txt'), 'w');
     fprintf(u1, '%s\n', 'Results of gate calculation, according to the method published in Belaud et al, 2014, with tabulated Cc');
-    fprintf(u1, '%s\n', '    h0     h1      W angle Dischar. R     Cd     Cc   nbIter -- R: regime noye=3, partiellement noye=2, denoye=1 ');
+    fprintf(u1, '%s\n', '    h0     h2      W angle Dischar. R     Cd     Cc     h1 nbIter -- R: regime noye=3, partiellement noye=2, denoye=1 ');
 
     %-------------------------------------------------------------------------------------------------------
     % Boucle sur les differentes mesures
@@ -195,8 +195,8 @@ function test_vanne(sInput)
             dQdhv = -dQdhm;
         end
 
-        fprintf(u1, '%6.3f %6.3f %6.3f %5.1f %8.4f %1i %6.3f %6.3f %3i\n', h0, h1, W, angle, Q, ...
-            etatVanne, Cd, Cc_app, nbIter);
+        fprintf(u1, '%6.3f %6.3f %6.3f %5.1f %8.4f %1i %6.3f %6.3f %6.3f %3i\n', h0, h2, W, angle, Q, ...
+            etatVanne, Cd, Cc_app, h1, nbIter);
     end
 
     fclose(u1);
